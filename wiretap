@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+LOGGER_TAG="wiretap"
+
+usage() {
+    echo "Usage: $0 <add|remove> <interface> <span-port>" >&2
+    exit 2
+}
+
+confirm_interface() {
+    local device="$1"
+    ip link show dev $device 2>&1
+}
+
+if ! command -v ip > /dev/null 2>&1
+then
+    echo "Missing depandancy: ip"
+    exit 1
+fi
+
+if ! command -v tc > /dev/null 2>&1
+then
+    echo "Missing depandancy: tc "
+    exit 1
+fi
+
+[[ $# -eq 3 ]] || usage
+
+action="$1"
+interface="$2"
+span="$3"
+
+case "$action" in
+    add|remove)
+        ;;
+    *)
+        echo "Invalid action: $action" >&2
+        usage
+        ;;
+esac
+
+[[ confirm_interface "$interface" ]] || {
+    echo "Invalid interface: $interface" >&2
+    exit 2
+}
+
+[[ confirm_interface "$span" ]] || {
+    echo "Invalid interface: $span" >&2
+    exit 2
+}
+
+add_tap() {
+    # rollback_tap() {
+    #     tc qdisc del $i ingress 2>/dev/null || true
+    #     tc qdisc del $i root 2>/dev/null || true
+    # }
+
+    # if ! tc qdisc add dev $i ingress; then
+    #     echo "Error: failed to add ingress qdisk to '$i'." >&2
+    #     return 1
+    # fi
+
+    # if ! tc filter add dev $i parent ffff: \ 
+    #     protocol all u32 match u8 0 0 \
+    #     action mirred egress mirror dev $SPAN_PORT
+    # then
+    #     echo "Error: failed to add ingress mirror filter." >&2
+    #     rollback_tap
+    #     return 1
+    # fi
+
+    # # Capture Egress Traffic (thx @nukingdragons)
+    # if ! tc qdisc add dev $i handle 1: root prio; then
+    #     echo "Error: failed to add root prio qdisc to '$i'." >&2
+    #     rollback_tap
+    #     return 1
+    # fi
+
+    # if ! tc filter add dev $i parent 1: \
+    #     protocol all u32 match u8 0 0 \
+    #     action mirred egress mirror dev $SPAN_PORT
+    # then
+    #     echo "Error: failer to add egress mirror filter." >&2
+    #     rollback_tap
+    #     return 1
+    # fi
+
+    if ! tc qdisc add dev "$interface" clsact; then
+         echo "Error: failed to add qdisk to '$interface'." >&2
+         return 1
+    fi
+
+    if ! tc filter add dev "$interface" ingress \
+        protocol all \
+        u32 match u8 0 0 \
+        action mirred egress mirror dev "$SPAN_PORT"
+    then
+        echo "Error: failed to add ingress mirror filter." >&2
+        remove_tap
+        return 1
+    fi
+
+    if ! tc filter add dev "$interface" egress \
+        protocol all \
+        u32 match u8 0 0 \
+        action mirred egress mirror dev "$span"
+    then
+        echo "Error: failed to add egress mirror filter." >&2
+        remove_tap
+        return 1
+    fi
+
+    echo "Added $interface ingress and egress mirroring to $span."
+}
+
+remove_tap() {
+    #tc qdisc del dev $interface ingress
+    #tc qdisc del dev $interface root
+
+    tc qdisc del dev "$interface" clsact
+
+    echo "Removed all ingress and egress mirroring from $interface"
+}
+
+case "$action" in
+    add)
+        logger -t "$LOGGER_TAG" \
+            "Taping interface ($interfac) to span port ($span)"
+        add_tap $interface $span
+        ;;
+    remove)
+        logger -t "$LOGGER_TAG" \
+            "removing tap from interface ($interfac) connected to span port ($span)"
+        remove_tap
+        ;;
+esac
