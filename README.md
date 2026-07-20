@@ -16,5 +16,9 @@ Added tap101i0 ingress and egress mirroring to vmbrSPAN1
 wiretap remove tap101i0 vmbrSPAN1
 ```
 ```text
-Removed tap101i0 ingress and egress mirroring to vmbrSPAN1
+Removed all ingress and egress mirroring from tap101i0
 ```
+
+## Credit
+
+This was built with inspiration from [tylerdotrar/tc-taps](https://github.com/tylerdotrar/tc-taps). However, Wiretap uses `clsact` to do ingress and egress filtering, as it enables ingress and egress filtering on a singualar qdisc and avoids deleting and creating a new root qdisc.
