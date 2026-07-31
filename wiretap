@@ -21,11 +21,15 @@ then
     exit 1
 fi
 
-[[ $# -eq 3 ]] || usage
+[[ $# -eq 2 || $# -eq 3 ]] || usage
 
 action="$1"
 interface="$2"
-span="$3"
+
+if [[ $# -eq 3 ]]; then
+    span="$3"
+fi
+
 
 case "$action" in
     add|remove)
@@ -36,21 +40,22 @@ case "$action" in
         ;;
 esac
 
-if [[ -z "$interface" || -z "$span" ]]; then
-    usage
-fi
-
-if ! ip link show dev "$interface" >/dev/null 2>&1; then
-    echo "Error: source interface '$interface' does not exist." >&2
-    exit 1
-fi
-
-if ! ip link show dev "$span" >/dev/null 2>&1; then
-    echo "Error: SPAN interface '$span' does not exist." >&2
-    exit 1
-fi
 
 add_tap() {
+
+    if [[ -z "$interface" || -z "$span" ]]; then
+        usage
+    fi
+
+    if ! ip link show dev "$interface" >/dev/null 2>&1; then
+        echo "Error: source interface '$interface' does not exist." >&2
+        exit 1
+    fi
+
+    if ! ip link show dev "$span" >/dev/null 2>&1; then
+        echo "Error: SPAN interface '$span' does not exist." >&2
+        exit 1
+    fi
 
     if ! tc qdisc add dev "$interface" clsact; then
          echo "Error: failed to add qdisk to '$interface'." >&2
@@ -81,6 +86,14 @@ add_tap() {
 }
 
 remove_tap() {
+    if [[ -z "$interface" ]]; then
+        usage
+    fi
+
+    if ! ip link show dev "$interface" >/dev/null 2>&1; then
+        echo "Error: source interface '$interface' does not exist." >&2
+        exit 1
+    fi
 
     tc qdisc del dev "$interface" clsact
 
