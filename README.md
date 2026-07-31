@@ -13,11 +13,20 @@ wiretap add tap101i0 vmbrSPAN1
 Added tap101i0 ingress and egress mirroring to vmbrSPAN1
 ```
 ```bash
-wiretap remove tap101i0 vmbrSPAN1
+wiretap remove tap101i0
 ```
 ```text
 Removed all ingress and egress mirroring from tap101i0
 ```
+
+### Adding a bridge
+
+```bash
+ip link add name vmbrSPAN1 type bridge
+ip link set dev vmbrSPAN1 up
+```
+
+
 
 ## Credit
 
